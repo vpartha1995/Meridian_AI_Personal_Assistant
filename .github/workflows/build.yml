@@ -10,7 +10,6 @@ permissions:
   contents: write
 
 jobs:
-  # Windows — self-contained NSIS .exe installer
   build-windows:
     name: Windows (.exe)
     runs-on: windows-latest
@@ -39,7 +38,7 @@ jobs:
       - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
 
-      - name: Build Tauri app (Windows)
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,35 +46,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Meridian ${{ github.ref_name }}'
-          releaseBody: |
-            ## Meridian ${{ github.ref_name }}
-
-            AI-powered personal productivity assistant. Runs 100% locally — no cloud, no subscriptions.
-
-            ### Install
-
-            Windows: Download Meridian_*_x64-setup.exe and run it (no admin rights needed).
-            macOS: Download Meridian_*_universal.dmg, open it, drag Meridian to Applications.
-
-            ### First launch
-
-            On first launch Meridian guides you through a one-time AI model download (~2.3 GB).
-            No other software needed — Ollama AI engine is bundled inside the installer.
-
-            ### What is included
-
-            - Local AI assistant (Ollama + Phi-3 Mini, fully offline after setup)
-            - Task manager with priorities, due dates, and AI tagging
-            - Daily briefing dashboard
-            - Quick-capture overlay (global hotkey)
-            - Integrations: Gmail, Slack, Jira, Outlook, Zoom, Google Chat
-            - AES-256-GCM encrypted local database
+          releaseName: "Meridian ${{ github.ref_name }}"
+          releaseBody: "AI-powered personal productivity assistant. Runs 100% locally - no cloud, no subscriptions. On first launch, Meridian guides you through a one-time AI model download (~2.3 GB). No other software needed - Ollama AI engine is bundled inside the installer."
           releaseDraft: false
           prerelease: false
           args: --target x86_64-pc-windows-msvc
 
-  # macOS — universal .dmg (Apple Silicon + Intel)
   build-macos:
     name: macOS Universal (.dmg)
     runs-on: macos-latest
@@ -88,7 +64,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install Rust stable + macOS targets
+      - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
@@ -98,32 +74,19 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      - name: Import Code Signing Certificate
-        if: secrets.APPLE_CERTIFICATE != ''
-        uses: apple-actions/import-codesign-certs@v3
-        with:
-          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
       - name: Install frontend deps
         run: npm ci
 
-      - name: Download Ollama sidecar (macOS universal)
+      - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
 
-      - name: Build Tauri app (macOS Universal)
+      - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'Meridian ${{ github.ref_name }}'
+          releaseName: "Meridian ${{ github.ref_name }}"
           releaseDraft: false
           prerelease: false
           args: --target universal-apple-darwin
