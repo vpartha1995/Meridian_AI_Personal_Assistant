@@ -1,0 +1,122 @@
+name: Build Meridian
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # ── Windows — self-contained NSIS .exe installer ─────────────────────────────
+  build-windows:
+    name: Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend deps
+        run: npm ci
+
+      # Download Ollama binary into src-tauri/binaries/ before Tauri builds.
+      # This step is what makes the installer self-contained — the binary is
+      # bundled via externalBin and users never need to install Ollama separately.
+      - name: Download Ollama sidecar (Windows)
+        run: node scripts/ensure-ollama.mjs
+
+      - name: Build Tauri app (Windows)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN:                       ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY:          ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName:     ${{ github.ref_name }}
+          releaseName: 'Meridian ${{ github.ref_name }}'
+          releaseBody: |
+            ## Meridian ${{ github.ref_name }}
+
+            AI-powered personal productivity assistant — runs 100% locally, no cloud.
+
+            ### Install
+            **Windows**: Download `Meridian_*_x64-setup.exe` and run it.
+            **macOS**: Download `Meridian_*_universal.dmg`, open it, drag Meridian to Applications.
+
+            ### First launch
+            On first launch Meridian will guide you through a one-time AI model download
+            (~2.3 GB). No other software needs to be installed.
+          releaseDraft: false
+          prerelease:   false
+          args: --target x86_64-pc-windows-msvc
+
+  # ── macOS — universal .dmg (Apple Silicon + Intel) ────────────────────────────
+  build-macos:
+    name: macOS Universal (.dmg)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Rust stable + macOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Import Code Signing Certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password:    ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Install frontend deps
+        run: npm ci
+
+      # Download BOTH arch Ollama binaries for the universal build.
+      # The script detects macOS and fetches aarch64 + x86_64 automatically.
+      - name: Download Ollama sidecar (macOS universal)
+        run: node scripts/ensure-ollama.mjs
+
+      - name: Build Tauri app (macOS Universal)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN:               ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE:          ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY:     ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID:                   ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD:             ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID:              ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName:     ${{ github.ref_name }}
+          releaseName: 'Meridian ${{ github.ref_name }}'
+          releaseDraft: false
+          prerelease:   false
+          args: --target universal-apple-darwin

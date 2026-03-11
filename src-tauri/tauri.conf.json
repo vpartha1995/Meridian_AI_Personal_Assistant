@@ -1,0 +1,91 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Meridian",
+  "version": "1.0.0",
+  "identifier": "com.meridian.app",
+  "build": {
+    "beforeDevCommand":   "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl":             "http://localhost:1420",
+    "frontendDist":       "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label":      "main",
+        "title":      "Meridian",
+        "width":      1200,
+        "height":     800,
+        "minWidth":   900,
+        "minHeight":  600,
+        "resizable":  true,
+        "decorations": true,
+        "center":     true,
+        "visible":    true,
+        "theme":      "Dark"
+      },
+      {
+        "label":       "overlay",
+        "title":       "Meridian Assistant",
+        "width":       420,
+        "height":      520,
+        "minWidth":    380,
+        "minHeight":   400,
+        "resizable":   true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible":     false,
+        "transparent": true,
+        "url":         "/overlay",
+        "theme":       "Dark"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:11434 http://127.0.0.1:11434"
+    },
+    "trayIcon": {
+      "iconPath":        "icons/tray-icon.png",
+      "iconAsTemplate":  true,
+      "menuOnLeftClick": false,
+      "title":           "Meridian"
+    }
+  },
+  "bundle": {
+    "active":  true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [],
+    "externalBin": ["binaries/ollama"],
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "webviewInstallMode": {
+        "type": "embedBootstrapper"
+      },
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "entitlements": "entitlements.plist",
+      "dmg": {
+        "windowSize": { "width": 540, "height": 380 },
+        "appPosition": { "x": 180, "y": 180 },
+        "applicationFolderPosition": { "x": 380, "y": 180 }
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": []
+      }
+    }
+  }
+}

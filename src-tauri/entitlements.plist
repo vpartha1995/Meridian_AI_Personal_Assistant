@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <!-- Allow spawning the bundled Ollama sidecar process -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+
+    <!-- Required for Ollama's Metal GPU acceleration on Apple Silicon -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+
+    <!-- Allow loading unsigned dynamic libraries bundled with the sidecar -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+
+    <!-- Outbound network access: Ollama API on localhost + OAuth flows -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+  </dict>
+</plist>
