@@ -93,6 +93,9 @@ jobs:
       - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
 
+      - name: Verify sidecar binaries
+        run: ls -lh src-tauri/binaries/
+
       - name: Cargo check (diagnostic)
         continue-on-error: true
         working-directory: src-tauri

@@ -183,6 +183,9 @@ function findLocalOllama() {
 }
 
 // ── Create macOS universal binary from the two arch-specific ones ─────────────
+// Recent Ollama releases ship a single fat (arm64+x86_64) universal binary for
+// macOS.  Both arch targets download the same file, so lipo -create would fail.
+// Detect that case and just copy the file instead of combining.
 function createUniversalBinary(binDir) {
   const arm64 = path.join(binDir, "ollama-aarch64-apple-darwin");
   const x64   = path.join(binDir, "ollama-x86_64-apple-darwin");
@@ -193,8 +196,20 @@ function createUniversalBinary(binDir) {
     return;
   }
 
-  console.log("[ensure-ollama] Creating universal binary via lipo...");
-  execSync(`lipo -create -output "${univ}" "${arm64}" "${x64}"`, { stdio: "inherit" });
+  // Check if the downloaded binary is already a fat (universal) Mach-O.
+  let lipoInfo = "";
+  try { lipoInfo = execSync(`lipo -info "${arm64}" 2>&1`, { encoding: "utf8" }); } catch { /* not on macOS or lipo unavailable */ }
+  const alreadyUniversal = lipoInfo.includes("arm64") && lipoInfo.includes("x86_64");
+
+  if (alreadyUniversal) {
+    // Ollama ships a pre-built universal binary — just copy it directly.
+    console.log("[ensure-ollama] Ollama binary is already universal — copying directly");
+    fs.copyFileSync(arm64, univ);
+  } else {
+    // Separate thin binaries — combine them into a fat binary.
+    console.log("[ensure-ollama] Creating universal binary via lipo -create...");
+    execSync(`lipo -create -output "${univ}" "${arm64}" "${x64}"`, { stdio: "inherit" });
+  }
   fs.chmodSync(univ, 0o755);
   const sizeMB = (fs.statSync(univ).size / 1024 / 1024).toFixed(1);
   console.log(`[ensure-ollama] OK  ollama-universal-apple-darwin  (${sizeMB} MB)`);
