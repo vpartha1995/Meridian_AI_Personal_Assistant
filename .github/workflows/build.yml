@@ -53,15 +53,30 @@ jobs:
           releaseBody: |
             ## Meridian ${{ github.ref_name }}
 
-            AI-powered personal productivity assistant — runs 100% locally, no cloud.
+            AI-powered personal productivity assistant — runs **100% locally**, no cloud, no subscriptions.
 
-            ### Install
-            **Windows**: Download `Meridian_*_x64-setup.exe` and run it.
-            **macOS**: Download `Meridian_*_universal.dmg`, open it, drag Meridian to Applications.
+            ---
+
+            ### Download & Install
+
+            | Platform | File | Steps |
+            |----------|------|-------|
+            | **Windows 10/11** | `Meridian_*_x64-setup.exe` | Download → double-click → follow installer (no admin needed) |
+            | **macOS 13+** | `Meridian_*_universal.dmg` | Download → open DMG → drag to Applications |
 
             ### First launch
-            On first launch Meridian will guide you through a one-time AI model download
-            (~2.3 GB). No other software needs to be installed.
+            On first launch Meridian will guide you through a one-time AI model download (~2.3 GB).
+            **No other software needs to be installed** — Ollama AI engine is bundled inside the installer.
+
+            ---
+
+            ### What's included
+            - Local AI assistant (Ollama + Phi-3 Mini, fully offline after setup)
+            - Task manager with priorities, due dates, and AI tagging
+            - Daily briefing dashboard
+            - Quick-capture overlay (global hotkey)
+            - Integrations: Gmail · Slack · Jira · Outlook · Zoom · Google Chat
+            - AES-256-GCM encrypted local database — your data never leaves your machine
           releaseDraft: false
           prerelease:   false
           args: --target x86_64-pc-windows-msvc
