@@ -31,12 +31,24 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          prefix-key: 'v1'
 
       - name: Install frontend deps
         run: npm ci
 
       - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
+
+      - name: Cargo check (diagnostic)
+        continue-on-error: true
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          cargo check --release --target x86_64-pc-windows-msvc 2>&1 | tee /tmp/cargo_check.txt || true
+          echo "## Cargo check (Windows)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/cargo_check.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -73,12 +85,23 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: './src-tauri -> target'
+          prefix-key: 'v1'
 
       - name: Install frontend deps
         run: npm ci
 
       - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
+
+      - name: Cargo check (diagnostic)
+        continue-on-error: true
+        working-directory: src-tauri
+        run: |
+          cargo check --release --target aarch64-apple-darwin 2>&1 | tee /tmp/cargo_check.txt || true
+          echo "## Cargo check (macOS)" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/cargo_check.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

@@ -182,6 +182,24 @@ function findLocalOllama() {
   return candidates.find((p) => p && fs.existsSync(p)) || null;
 }
 
+// ── Create macOS universal binary from the two arch-specific ones ─────────────
+function createUniversalBinary(binDir) {
+  const arm64 = path.join(binDir, "ollama-aarch64-apple-darwin");
+  const x64   = path.join(binDir, "ollama-x86_64-apple-darwin");
+  const univ  = path.join(binDir, "ollama-universal-apple-darwin");
+
+  if (!fs.existsSync(arm64) || !fs.existsSync(x64)) {
+    console.warn("[ensure-ollama] Skipping universal binary: arch-specific binaries not both present");
+    return;
+  }
+
+  console.log("[ensure-ollama] Creating universal binary via lipo...");
+  execSync(`lipo -create -output "${univ}" "${arm64}" "${x64}"`, { stdio: "inherit" });
+  fs.chmodSync(univ, 0o755);
+  const sizeMB = (fs.statSync(univ).size / 1024 / 1024).toFixed(1);
+  console.log(`[ensure-ollama] OK  ollama-universal-apple-darwin  (${sizeMB} MB)`);
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
   fs.mkdirSync(BIN_DIR, { recursive: true });
@@ -194,6 +212,7 @@ async function main() {
       const sizeMB = (fs.statSync(path.join(BIN_DIR, t.dest)).size / 1024 / 1024).toFixed(1);
       console.log(`[ensure-ollama] OK  ${t.dest}  (${sizeMB} MB) — already present`);
     }
+    if (process.platform === "darwin") createUniversalBinary(BIN_DIR);
     return;
   }
 
@@ -302,6 +321,8 @@ async function main() {
     const sizeMB = (fs.statSync(dest).size / 1024 / 1024).toFixed(1);
     console.log(`[ensure-ollama] OK  ${target.dest}  (${sizeMB} MB)`);
   }
+
+  if (process.platform === "darwin") createUniversalBinary(BIN_DIR);
 
   console.log("\n[ensure-ollama] All Ollama binaries ready. Proceeding with Tauri build...\n");
 }
