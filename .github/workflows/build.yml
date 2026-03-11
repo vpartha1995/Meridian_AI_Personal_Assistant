@@ -97,6 +97,9 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - name: Build frontend
+        run: npm run build
+
       - name: Download Ollama sidecar
         run: node scripts/ensure-ollama.mjs
 

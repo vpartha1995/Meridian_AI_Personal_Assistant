@@ -37,22 +37,19 @@ pub fn run() {
 
             // Register global shortcut CTRL+SPACE for overlay
             let handle = app_handle.clone();
-            if let Ok(shortcut) =
-                Shortcut::new(Some(Modifiers::CONTROL), Code::Space)
-            {
-                app.global_shortcut()
-                    .on_shortcut(shortcut, move |_app, _shortcut, _event| {
-                        if let Some(overlay) = handle.get_webview_window("overlay") {
-                            if overlay.is_visible().unwrap_or(false) {
-                                let _ = overlay.hide();
-                            } else {
-                                let _ = overlay.show();
-                                let _ = overlay.set_focus();
-                            }
+            let shortcut = Shortcut::new(Some(Modifiers::CONTROL), Code::Space);
+            app.global_shortcut()
+                .on_shortcut(shortcut, move |_app, _shortcut, _event| {
+                    if let Some(overlay) = handle.get_webview_window("overlay") {
+                        if overlay.is_visible().unwrap_or(false) {
+                            let _ = overlay.hide();
+                        } else {
+                            let _ = overlay.show();
+                            let _ = overlay.set_focus();
                         }
-                    })
-                    .ok();
-            }
+                    }
+                })
+                .ok();
 
             // Spawn background services
             let state_clone = state.clone();

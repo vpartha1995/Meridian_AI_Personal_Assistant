@@ -6,7 +6,7 @@ use crate::storage::keychain::Keychain;
 use crate::tasks::reminder::ReminderEngine;
 use anyhow::Result;
 use std::sync::Arc;
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tokio::sync::Mutex;
 
 pub struct AppState {
