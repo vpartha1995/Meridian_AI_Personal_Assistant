@@ -89,7 +89,13 @@ export function TasksPage() {
           task={editing ?? undefined}
           onSave={async (data) => {
             if (editing) {
-              const updated = { ...editing, ...data };
+              const updated: Task = {
+                ...editing,
+                title: data.title,
+                description: data.description ?? editing.description,
+                due_at: data.due_at ?? editing.due_at,
+                priority: data.priority,
+              };
               await taskApi.update(updated);
               updateTask(updated);
             } else {
