@@ -65,6 +65,13 @@ export const settingsApi = {
   getTheme:       ()                   => invoke<string>("get_theme"),
   setTheme:       (theme: string)      => invoke<void>("set_theme", { theme }),
   logHealthAction:(action: string)     => invoke<void>("log_health_action", { action }),
+  // OAuth app credentials (stored securely in OS keychain)
+  setOAuthCreds:    (integrationId: string, clientId: string, clientSecret: string) =>
+    invoke<void>("set_oauth_creds", { integrationId, clientId, clientSecret }),
+  getOAuthClientId: (integrationId: string) =>
+    invoke<string | null>("get_oauth_client_id", { integrationId }),
+  deleteOAuthCreds: (integrationId: string) =>
+    invoke<void>("delete_oauth_creds", { integrationId }),
 };
 
 // ── Window ────────────────────────────────────────────────────────────────────

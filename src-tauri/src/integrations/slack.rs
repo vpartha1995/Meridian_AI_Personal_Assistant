@@ -49,10 +49,21 @@ impl IntegrationPlugin for SlackPlugin {
     async fn authenticate(&self) -> Result<(), IntegrationError> {
         use std::net::TcpListener;
 
-        let client_id = std::env::var("SLACK_CLIENT_ID")
-            .unwrap_or_else(|_| "YOUR_SLACK_CLIENT_ID".to_string());
-        let client_secret = std::env::var("SLACK_CLIENT_SECRET")
-            .unwrap_or_else(|_| "YOUR_SLACK_CLIENT_SECRET".to_string());
+        let (client_id, client_secret) = self.keychain
+            .get_oauth_creds(ID)
+            .map_err(|_| IntegrationError::AuthFailed(
+                "Slack OAuth credentials are not configured. \
+                 Go to Settings → Integrations → Slack Setup and enter \
+                 your Slack App Client ID and Client Secret.".to_string()
+            ))?;
+
+        if client_id.is_empty() || client_secret.is_empty() {
+            return Err(IntegrationError::AuthFailed(
+                "Slack Client ID or Secret is empty. \
+                 Go to Settings → Integrations → Slack Setup and enter \
+                 your credentials from api.slack.com/apps.".to_string()
+            ));
+        }
 
         let listener = TcpListener::bind("127.0.0.1:0")
             .map_err(|e| IntegrationError::AuthFailed(e.to_string()))?;

@@ -81,4 +81,40 @@ impl Keychain {
             .context("Keychain entry creation failed")?;
         entry.get_password().context("Account not found")
     }
+
+    // ── App-level OAuth credentials (client_id / client_secret) ─────────────
+    // These are the developer credentials for a user's own OAuth app,
+    // distinct from the per-user access tokens stored above.
+
+    pub fn store_oauth_creds(&self, integration_id: &str, client_id: &str, client_secret: &str) -> Result<()> {
+        let json = serde_json::json!({ "client_id": client_id, "client_secret": client_secret });
+        let account = format!("oauth_creds.{integration_id}");
+        let entry = Entry::new(SERVICE, &account)
+            .context("Keychain entry creation failed")?;
+        entry.set_password(&json.to_string()).context("Cannot store OAuth creds")
+    }
+
+    pub fn get_oauth_creds(&self, integration_id: &str) -> Result<(String, String)> {
+        let account = format!("oauth_creds.{integration_id}");
+        let entry = Entry::new(SERVICE, &account)
+            .context("Keychain entry creation failed")?;
+        let json_str = entry.get_password().context("OAuth creds not found")?;
+        let v: serde_json::Value = serde_json::from_str(&json_str)
+            .context("Invalid OAuth creds JSON")?;
+        let client_id     = v["client_id"].as_str().unwrap_or("").to_string();
+        let client_secret = v["client_secret"].as_str().unwrap_or("").to_string();
+        Ok((client_id, client_secret))
+    }
+
+    pub fn delete_oauth_creds(&self, integration_id: &str) -> Result<()> {
+        let account = format!("oauth_creds.{integration_id}");
+        let entry = Entry::new(SERVICE, &account)
+            .context("Keychain entry creation failed")?;
+        entry.delete_password().context("Cannot delete OAuth creds")
+    }
+
+    /// Returns only the client_id (safe to expose to the frontend for display).
+    pub fn get_oauth_client_id(&self, integration_id: &str) -> Option<String> {
+        self.get_oauth_creds(integration_id).ok().map(|(id, _)| id)
+    }
 }

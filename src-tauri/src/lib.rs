@@ -136,6 +136,9 @@ pub fn run() {
             commands::settings::get_theme,
             commands::settings::set_theme,
             commands::settings::log_health_action,
+            commands::settings::set_oauth_creds,
+            commands::settings::get_oauth_client_id,
+            commands::settings::delete_oauth_creds,
             // Window
             commands::window::show_overlay,
             commands::window::hide_overlay,

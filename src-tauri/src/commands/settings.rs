@@ -88,3 +88,41 @@ pub async fn log_health_action(
     let db  = s.db.lock().await;
     db.set_setting(&key, &chrono::Utc::now().to_rfc3339()).map_err(|e| e.to_string())
 }
+
+/// Store the OAuth app credentials (client_id + client_secret) for an
+/// integration in the OS keychain.  The secret is never returned to the
+/// frontend — only the client_id is exposed via `get_oauth_client_id`.
+#[tauri::command]
+pub async fn set_oauth_creds(
+    integration_id: String,
+    client_id:      String,
+    client_secret:  String,
+    state:          AppStateGuard<'_>,
+) -> CmdResult<()> {
+    let s = state.lock().await;
+    s.keychain
+        .store_oauth_creds(&integration_id, &client_id, &client_secret)
+        .map_err(|e| e.to_string())
+}
+
+/// Returns the stored client_id for `integration_id`, or `null` if not
+/// configured.  The client_secret is intentionally not returned.
+#[tauri::command]
+pub async fn get_oauth_client_id(
+    integration_id: String,
+    state:          AppStateGuard<'_>,
+) -> CmdResult<Option<String>> {
+    let s = state.lock().await;
+    Ok(s.keychain.get_oauth_client_id(&integration_id))
+}
+
+/// Remove stored OAuth app credentials for an integration.
+#[tauri::command]
+pub async fn delete_oauth_creds(
+    integration_id: String,
+    state:          AppStateGuard<'_>,
+) -> CmdResult<()> {
+    let s = state.lock().await;
+    let _ = s.keychain.delete_oauth_creds(&integration_id);
+    Ok(())
+}

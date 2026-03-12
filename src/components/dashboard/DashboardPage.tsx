@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { RefreshCw, WifiOff, Download, X, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
 import { useSummaryStore } from "@/store/summaryStore";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useTaskStore } from "@/store/taskStore";
 import { summaryApi, aiApi } from "@/lib/tauri";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { LoadingScreen } from "@/components/shared/LoadingScreen";
 import { GreetingHeader } from "./GreetingHeader";
 import { DailySummaryCard } from "./DailySummaryCard";
@@ -14,6 +16,8 @@ import { MeetingWidget } from "./MeetingWidget";
 import type { OllamaStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+type PullState = "idle" | "downloading" | "done" | "error";
+
 export function DashboardPage() {
   const { summary, setSummary, isGenerating, setIsGenerating } = useSummaryStore();
   const { settings }   = useSettingsStore();
@@ -21,11 +25,45 @@ export function DashboardPage() {
   const [ready, setReady]         = useState(false);
   const [aiStatus, setAiStatus]   = useState<OllamaStatus | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [aiBannerDismissed, setAiBannerDismissed] = useState(
+    () => !!sessionStorage.getItem("ai-banner-dismissed")
+  );
+  const [pullState,   setPullState]   = useState<PullState>("idle");
+  const [pullPct,     setPullPct]     = useState(0);
+  const [pullMsg,     setPullMsg]     = useState("");
 
   useEffect(() => {
     initDashboard();
     aiApi.status().then(setAiStatus).catch(() => {});
   }, []);
+
+  async function startModelDownload() {
+    setPullState("downloading");
+    setPullPct(0);
+    setPullMsg("Connecting to Ollama…");
+
+    const unlisten = await listen<{ percent: number; status: string }>(
+      "ollama://pull-progress",
+      ({ payload }) => {
+        setPullPct(payload.percent);
+        setPullMsg(payload.status);
+        if (payload.status === "success") {
+          setPullState("done");
+          aiApi.status().then(setAiStatus).catch(() => {});
+        }
+      }
+    );
+
+    try {
+      await invoke("pull_model", { model: "phi3:mini" });
+      setPullState((prev) => prev === "downloading" ? "done" : prev);
+    } catch (e) {
+      setPullState("error");
+      setPullMsg(String(e));
+    } finally {
+      unlisten();
+    }
+  }
 
   async function initDashboard() {
     setIsGenerating(true);
@@ -94,6 +132,77 @@ export function DashboardPage() {
           </button>
         </div>
       </div>
+
+      {/* AI model setup banner — shown when Ollama is running but model not pulled */}
+      <AnimatePresence>
+        {aiStatus && aiStatus.available && !aiStatus.model_ready && !aiBannerDismissed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            className="flex-shrink-0 border-b border-yellow-500/20 bg-yellow-500/5 px-6 py-3"
+          >
+            {pullState === "idle" && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-yellow-400 text-sm">
+                  <AlertCircle size={14} className="flex-shrink-0" />
+                  <span>AI model (phi3:mini) is not downloaded. Download it to enable smart summaries, email drafting, and the assistant.</span>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={startModelDownload}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-300 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    <Download size={12} /> Download (~2.3 GB)
+                  </button>
+                  <button
+                    onClick={() => { setAiBannerDismissed(true); sessionStorage.setItem("ai-banner-dismissed", "1"); }}
+                    className="text-yellow-400/50 hover:text-yellow-400 transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+            {pullState === "downloading" && (
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 text-yellow-400 text-xs">
+                  <Loader2 size={12} className="animate-spin flex-shrink-0" />
+                  <span className="truncate">{pullMsg || "Downloading phi3:mini…"}</span>
+                  <span className="ml-auto font-mono tabular-nums">{pullPct}%</span>
+                </div>
+                <div className="w-full h-1.5 bg-yellow-500/10 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-yellow-400 rounded-full"
+                    animate={{ width: `${pullPct}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
+              </div>
+            )}
+            {pullState === "done" && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <CheckCircle2 size={14} />
+                <span>phi3:mini downloaded — AI features are now active!</span>
+              </div>
+            )}
+            {pullState === "error" && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-red-400 text-xs">
+                  <AlertCircle size={12} />
+                  <span className="truncate">{pullMsg || "Download failed. Check that Ollama is running."}</span>
+                </div>
+                <button
+                  onClick={startModelDownload}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/20 border border-red-500/30 text-red-300 rounded-lg text-xs font-medium transition-colors flex-shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Scrollable body */}
       <div className="flex-1 overflow-y-auto">

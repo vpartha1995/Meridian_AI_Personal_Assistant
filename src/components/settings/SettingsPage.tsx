@@ -1,20 +1,22 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { CheckCircle2 } from "lucide-react";
 import { useSettingsStore } from "@/store/settingsStore";
-import { integrationApi } from "@/lib/tauri";
+import { integrationApi, settingsApi } from "@/lib/tauri";
 import { IntegrationCard } from "./IntegrationCard";
 import { ScanSettings } from "./ScanSettings";
 import type { IntegrationInfo, AppSettings } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Moon, Sun, User, Puzzle, Clock, Palette } from "lucide-react";
+import { Moon, Sun, User, Puzzle, Clock, Palette, KeyRound } from "lucide-react";
 
-type SettingsTab = "profile" | "integrations" | "schedule" | "appearance";
+type SettingsTab = "profile" | "integrations" | "schedule" | "appearance" | "oauth";
 
 const TABS: { id: SettingsTab; label: string; icon: React.ComponentType<any> }[] = [
-  { id: "profile",      label: "Profile",      icon: User    },
-  { id: "integrations", label: "Integrations", icon: Puzzle  },
-  { id: "schedule",     label: "Schedule",     icon: Clock   },
-  { id: "appearance",   label: "Appearance",   icon: Palette },
+  { id: "profile",      label: "Profile",      icon: User     },
+  { id: "integrations", label: "Integrations", icon: Puzzle   },
+  { id: "schedule",     label: "Schedule",     icon: Clock    },
+  { id: "appearance",   label: "Appearance",   icon: Palette  },
+  { id: "oauth",        label: "OAuth Setup",  icon: KeyRound },
 ];
 
 export function SettingsPage() {
@@ -23,17 +25,60 @@ export function SettingsPage() {
   const [integrations, setIntegrations] = useState<IntegrationInfo[]>([]);
   const [localSettings, setLocal]       = useState<AppSettings | null>(null);
   const [saving, setSaving]             = useState(false);
+  const [saved,  setSaved]              = useState(false);
+
+  // Slack OAuth credential state
+  const [slackClientId,     setSlackClientId]     = useState("");
+  const [slackClientSecret, setSlackClientSecret] = useState("");
+  const [slackSaving,       setSlackSaving]       = useState(false);
+  const [slackSaved,        setSlackSaved]        = useState(false);
+  const [slackConfigured,   setSlackConfigured]   = useState<string | null>(null);
 
   useEffect(() => {
     if (settings) setLocal({ ...settings });
     integrationApi.list().then(setIntegrations).catch(() => {});
   }, [settings]);
 
+  useEffect(() => {
+    if (tab === "oauth") {
+      settingsApi.getOAuthClientId("slack")
+        .then((id) => setSlackConfigured(id))
+        .catch(() => setSlackConfigured(null));
+    }
+  }, [tab]);
+
   async function handleSave() {
     if (!localSettings) return;
     setSaving(true);
-    await save(localSettings);
-    setSaving(false);
+    try {
+      await save(localSettings);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveSlack() {
+    if (!slackClientId.trim() || !slackClientSecret.trim()) return;
+    setSlackSaving(true);
+    try {
+      await settingsApi.setOAuthCreds("slack", slackClientId.trim(), slackClientSecret.trim());
+      setSlackConfigured(slackClientId.trim());
+      setSlackClientId("");
+      setSlackClientSecret("");
+      setSlackSaved(true);
+      setTimeout(() => setSlackSaved(false), 2500);
+    } catch (e) {
+      alert(`Failed to save Slack credentials: ${e}`);
+    } finally {
+      setSlackSaving(false);
+    }
+  }
+
+  async function handleClearSlack() {
+    await settingsApi.deleteOAuthCreds("slack").catch(() => {});
+    setSlackConfigured(null);
   }
 
   function updateLocal(patch: Partial<AppSettings>) {
@@ -92,7 +137,7 @@ export function SettingsPage() {
                     />
                   </Field>
                 </Section>
-                <SaveButton saving={saving} onSave={handleSave} />
+                <SaveButton saving={saving} saved={saved} onSave={handleSave} />
               </>
             )}
 
@@ -111,6 +156,9 @@ export function SettingsPage() {
                     <p className="text-sm text-muted-foreground italic">Loading integrations…</p>
                   )}
                 </div>
+                <p className="text-xs text-muted-foreground mt-4">
+                  To connect Slack, first add your Slack App credentials in the <strong>OAuth Setup</strong> tab.
+                </p>
               </Section>
             )}
 
@@ -118,7 +166,7 @@ export function SettingsPage() {
             {tab === "schedule" && localSettings && (
               <>
                 <ScanSettings settings={localSettings} onChange={updateLocal} />
-                <SaveButton saving={saving} onSave={handleSave} />
+                <SaveButton saving={saving} saved={saved} onSave={handleSave} />
               </>
             )}
 
@@ -143,6 +191,71 @@ export function SettingsPage() {
                   ))}
                 </div>
               </Section>
+            )}
+
+            {/* ── OAuth Setup ── */}
+            {tab === "oauth" && (
+              <>
+                <Section
+                  title="Slack OAuth App Credentials"
+                  subtitle="Meridian uses your own Slack App so your data never passes through third-party servers. Create a free app at api.slack.com/apps."
+                >
+                  {slackConfigured && (
+                    <div className="flex items-center justify-between p-3 bg-green-500/10 border border-green-500/20 rounded-lg mb-4">
+                      <div className="flex items-center gap-2 text-green-400 text-sm">
+                        <CheckCircle2 size={14} />
+                        <span>Configured — Client ID: <code className="font-mono text-xs">{slackConfigured}</code></span>
+                      </div>
+                      <button
+                        onClick={handleClearSlack}
+                        className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">Setup steps:</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>Go to <span className="font-mono">api.slack.com/apps</span> → Create New App</li>
+                        <li>Under OAuth &amp; Permissions, add redirect URL: <span className="font-mono">http://localhost:*</span></li>
+                        <li>Add scopes: channels:history, channels:read, im:history, search:read, users:read</li>
+                        <li>Copy your Client ID and Client Secret below</li>
+                      </ol>
+                    </div>
+
+                    <Field label="Client ID">
+                      <input
+                        value={slackClientId}
+                        onChange={(e) => setSlackClientId(e.target.value)}
+                        placeholder="1234567890.1234567890"
+                        className="input-field font-mono text-sm"
+                      />
+                    </Field>
+                    <Field label="Client Secret">
+                      <input
+                        type="password"
+                        value={slackClientSecret}
+                        onChange={(e) => setSlackClientSecret(e.target.value)}
+                        placeholder="••••••••••••••••••••••••••••••••"
+                        className="input-field font-mono text-sm"
+                      />
+                    </Field>
+
+                    <button
+                      onClick={handleSaveSlack}
+                      disabled={!slackClientId.trim() || !slackClientSecret.trim() || slackSaving}
+                      className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {slackSaved ? (
+                        <><CheckCircle2 size={14} className="text-green-300" /> Saved!</>
+                      ) : slackSaving ? "Saving…" : "Save Slack Credentials"}
+                    </button>
+                  </div>
+                </Section>
+              </>
             )}
           </motion.div>
         </div>
@@ -172,17 +285,16 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function SaveButton({ saving, onSave }: { saving: boolean; onSave: () => void }) {
+function SaveButton({ saving, saved, onSave }: { saving: boolean; saved: boolean; onSave: () => void }) {
   return (
     <button
       onClick={onSave}
       disabled={saving}
-      className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+      className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
     >
-      {saving ? "Saving…" : "Save Changes"}
+      {saved ? (
+        <><CheckCircle2 size={14} className="text-green-300" /> Saved!</>
+      ) : saving ? "Saving…" : "Save Changes"}
     </button>
   );
 }
-
-// Tailwind utility class — add to globals later
-// input-field: bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring w-full text-foreground
